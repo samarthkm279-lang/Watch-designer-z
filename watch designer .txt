@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Watch Designer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+body { margin:0; overflow:hidden; background:#111; touch-action:none; }
+#ui {
+    position:absolute; top:10px; left:10px;
+    background: rgba(0,0,0,0.8);
+    padding:15px; border-radius:12px;
+    color:white; font-family:Arial;
+    width:90%;
+    max-width:300px;
+    max-height:90%;
+    overflow-y:auto;
+    box-sizing:border-box;
+    transition: all 0.4s ease;
+    opacity:1;
+}
+#ui.hidden { opacity:0; pointer-events:none; }
+#ui h3 { margin-top:0; font-size:20px; }
+input, select, button {
+    width:100%; margin-top:12px; padding:10px;
+    border-radius:8px; border:none; font-size:16px;
+}
+button { background:#444; color:white; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+<h3>Watch Designer</h3>
+
+<label>Case Shape</label>
+<select id="shapeSelector">
+<option value="circle">Circle</option>
+<option value="square">Square</option>
+<option value="rectangle">Rectangle</option>
+<option value="tonneau">Tonneau</option>
+<option value="octagon">Octagon</option>
+<option value="cushion">Cushion</option>
+<option value="oval">Oval</option>
+</select>
+
+<label>Case Color</label>
+<input type="color" id="caseColor">
+
+<label>Material Preset</label>
+<select id="materialPreset">
+<option value="steel">Stainless Steel</option>
+<option value="gold">Gold</option>
+<option value="black">Black Ceramic</option>
+<option value="rubber">Rubber</option>
+</select>
+
+<label>Dial Image</label>
+<input type="file" id="dialImage" accept="image/*">
+
+<label>Strap Texture</label>
+<input type="file" id="strapTexture" accept="image/*">
+
+<label>Strap Shape</label>
+<select id="strapSelector">
+<option value="leather">Leather</option>
+<option value="rubber">Rubber</option>
+<option value="tireRubber">Tire Rubber</option>
+<option value="nato">NATO</option>
+<option value="metalLink">Metal Link</option>
+<option value="metalOyster">Metal Oyster</option>
+<option value="mesh">Mesh</option>
+<option value="silicone">Silicone</option>
+</select>
+
+<label>Case Back Logo</label>
+<input type="file" id="logoImage" accept="image/*">
+
+<button id="explodedBtn">Exploded View</button>
+<button id="captureBtn">Export Photo</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.154/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// Scene setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0,1.7,3);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.appendChild(renderer.domElement);
+
+// Controls
+const controls = new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.rotateSpeed = 0.5;
+controls.zoomSpeed = 0.8;
+controls.panSpeed = 0.5;
+controls.enablePan = true;
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff,0.5));
+const light1 = new THREE.DirectionalLight(0xffffff,1.5);
+light1.position.set(5,10,5);
+scene.add(light1);
+
+// Case shapes and watch parts
+const shapes = {
+    circle: new THREE.CylinderGeometry(1,1,0.3,64),
+    square: new THREE.BoxGeometry(1.7,1.7,0.3),
+    rectangle: new THREE.BoxGeometry(1.7,2.2,0.3),
+    tonneau: new THREE.CapsuleGeometry(1,0.5,10,30),
+    octagon: new THREE.CylinderGeometry(1,1,0.3,8),
+    cushion: new THREE.CylinderGeometry(1,1,0.3,32),
+    oval: new THREE.CylinderGeometry(1,1,0.3,64)
+};
+let caseMesh = new THREE.Mesh(shapes.circle,new THREE.MeshStandardMaterial({color:0xffffff,metalness:0.7,roughness:0.3}));
+scene.add(caseMesh);
+
+const dial = new THREE.Mesh(new THREE.CircleGeometry(0.9,64), new THREE.MeshStandardMaterial({color:0xffffff}));
+dial.position.z = 0.16;
+scene.add(dial);
+
+let strap = new THREE.Mesh(new THREE.BoxGeometry(0.8,3.5,0.15), new THREE.MeshStandardMaterial({color:0x555555}));
+strap.position.y=-2.1;
+scene.add(strap);
+
+let logoMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.6), new THREE.MeshStandardMaterial({transparent:true}));
+logoMesh.position.z=-0.16;
+logoMesh.rotation.x=Math.PI;
+scene.add(logoMesh);
+
+// UI elements
+const ui = document.getElementById("ui");
+let hideTimeout;
+
+// Function to show UI
+function showUI(){
+    ui.classList.remove("hidden");
+    clearTimeout(hideTimeout);
+    hideTimeout = setTimeout(()=>ui.classList.add("hidden"), 3000);
+}
+
+// Show UI initially and set auto-hide
+showUI();
+
+// Show UI on any screen tap
+renderer.domElement.addEventListener("touchstart", showUI);
+
+// UI interactions
+document.getElementById("shapeSelector").onchange = (e)=>{
+scene.remove(caseMesh);
+caseMesh = new THREE.Mesh(shapes[e.target.value],caseMesh.material);
+scene.add(caseMesh);
+};
+document.getElementById("caseColor").oninput = (e)=>{ caseMesh.material.color.set(e.target.value); };
+document.getElementById("materialPreset").onchange=(e)=>{
+const mat=caseMesh.material;
+if(e.target.value==="steel"){ mat.metalness=0.8; mat.roughness=0.3; mat.color.set(0xcccccc); }
+if(e.target.value==="gold"){ mat.metalness=1; mat.roughness=0.2; mat.color.set(0xffd700); }
+if(e.target.value==="black"){ mat.metalness=0.9; mat.roughness=0.5; mat.color.set(0x111111); }
+if(e.target.value==="rubber"){ mat.metalness=0; mat.roughness=0.8; mat.color.set(0x333333); }
+};
+document.getElementById("dialImage").onchange=(event)=>{
+const reader=new FileReader();
+reader.onload=function(e){ let tex=new THREE.TextureLoader().load(e.target.result); dial.material.map=tex; dial.material.needsUpdate=true; }
+reader.readAsDataURL(event.target.files[0]);
+};
+document.getElementById("strapTexture").onchange=(event)=>{
+const reader=new FileReader();
+reader.onload=function(e){ let tex=new THREE.TextureLoader().load(e.target.result); strap.material.map=tex; strap.material.needsUpdate=true; }
+reader.readAsDataURL(event.target.files[0]);
+};
+document.getElementById("strapSelector").onchange=(e)=>{
+scene.remove(strap);
+let shape=e.target.value;
+if(shape==="leather"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.8,3.5,0.15), strap.material); strap.position.y=-2.1; }
+if(shape==="rubber"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.8,3.5,0.15), strap.material); strap.position.y=-2.1; }
+if(shape==="tireRubber"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.85,3.5,0.15), strap.material); strap.position.y=-2.1; }
+if(shape==="nato"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.7,3.7,0.12), strap.material); strap.position.y=-2.1; }
+if(shape==="metalLink"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.85,3.6,0.18), strap.material); strap.position.y=-2.1; }
+if(shape==="metalOyster"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.9,3.5,0.18), strap.material); strap.position.y=-2.1; }
+if(shape==="mesh"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.88,3.5,0.15), strap.material); strap.position.y=-2.1; }
+if(shape==="silicone"){ strap=new THREE.Mesh(new THREE.BoxGeometry(0.8,3.5,0.15), strap.material); strap.position.y=-2.1; }
+scene.add(strap);
+};
+document.getElementById("logoImage").onchange=(event)=>{
+const reader=new FileReader();
+reader.onload=function(e){ let tex=new THREE.TextureLoader().load(e.target.result); logoMesh.material.map=tex; logoMesh.material.needsUpdate=true; }
+reader.readAsDataURL(event.target.files[0]);
+};
+let exploded=false;
+document.getElementById("explodedBtn").onclick=()=>{
+exploded=!exploded; dial.position.z=exploded?0.5:0.16; strap.position.y=exploded?-3.5:-2.1; logoMesh.position.z=exploded?-0.5:-0.16;
+};
+document.getElementById("captureBtn").onclick=()=>{
+const link=document.createElement("a");
+link.download="watch_design.png";
+link.href=renderer.domElement.toDataURL("image/png");
+link.click();
+};
+
+// Animate
+function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera);}
+animate();
+
+window.addEventListener("resize",()=>{ camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth,window.innerHeight); });
+</script>
+</body>
+</html>
